@@ -4,8 +4,6 @@ A copy-editor's desk for text, in the browser. Dark manuscript page,
 red-ink markup, no sign-up, nothing leaves your device except the two
 CDN libraries it loads for file import.
 
-**Live artifact:** https://claude.ai/artifact/KZEFHEvZErSN6r2ZnEThCA
-
 ## What it does
 
 | Mode | What you get |
