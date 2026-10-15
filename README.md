@@ -1,97 +1,84 @@
-# typo_engine.py
+# Redline
 
-A small kinetic-typography video engine. It renders an animated promo
-video entirely from code — no stock footage, no generative AI image or
-video model, no sample library for the audio. Pillow draws every frame,
-ffmpeg stitches them into an `.mp4`, and numpy/scipy synthesize the
-sound effects from sine waves and filtered noise. Same input, same
-output, every run.
+A copy-editor's desk for text, in the browser. Dark manuscript page,
+red-ink markup, no sign-up, nothing leaves your device except the two
+CDN libraries it loads for file import.
 
-Built for **Redline** (a browser-based paraphrase/humanize/summarize/
-read-check tool), but the engine itself is generic — swap in your own
-beats and theme for any other project.
+**Live artifact:** https://claude.ai/artifact/KZEFHEvZErSN6r2ZnEThCA
 
-## Requirements
+## What it does
 
-- Python 3 with `pillow`, `numpy`, `scipy`
-- `ffmpeg` on your `PATH`
-- The DejaVu Serif / DejaVu Sans Mono fonts (ships by default on most
-  Linux systems; point the `SERIF`/`MONO` constants elsewhere if not)
+| Mode | What you get |
+|---|---|
+| **paraphrase** | Swaps words via a built-in synonym set. Struck-through = original, italic = replacement. Three intensities: standard / fluency / creative. |
+| **humanize** | Paraphrases, then varies sentence rhythm (merges short sentences, random openers) and applies contractions, to read less uniform. Light / standard / heavy. |
+| **summarize** | Extractive summary — scores sentences by keyword weight, keeps the top-scoring ones in original order. Short / medium / long keeps ~25% / 40% / 60% of sentences. |
+| **stats** | Word count, sentence count, avg words/sentence, reading time, and a Flesch reading-ease score with a plain-language difficulty label. |
+| **read-check** | A heuristic 0–100 "AI-likelihood" score from sentence-length uniformity (burstiness), vocabulary diversity, and stock AI phrase hits ("delve into", "it's important to note", etc). |
 
-```bash
-pip install pillow numpy scipy
-```
+Plus: **import** `.txt` / `.docx` / `.pdf` straight into the editor, and
+**download** any result as a `.txt` file.
 
-## Usage
+## Running it
 
-```bash
-python3 typo_engine.py
-```
+It's a single self-contained `.html` file. Two ways to use it:
 
-Writes `redline_promo.mp4` (1280×720, 30fps, H.264 video + AAC audio)
-to `/mnt/user-data/outputs/` by default. Change the output path with
-`render(out_path="...")`.
+- Open the published artifact link above, or
+- Download `redline.html` and open it directly in any browser — no
+  server, no build step, no install.
 
-## How it's structured
+Two libraries load from CDN for file import (everything else is
+inline, zero dependencies):
+- [`pdf.js`](https://mozilla.github.io/pdf.js/) (3.11.174) — extracts
+  text from `.pdf`
+- [`mammoth.js`](https://github.com/mwilliamson/mammoth.js) (1.6.0) —
+  extracts text from `.docx`
 
-**Beats.** Each scene is a plain function `beat_name(t) -> PIL.Image`,
-where `t` goes from 0 to 1 over that beat's duration. Inside, you
-animate by computing positions/colors/sizes as a function of `t` (see
-`ease_out`, `lerp`, `lerp_color` helpers). A beat's audio cues live in
-a parallel list right below it, e.g.:
+If you're offline, paraphrase/humanize/summarize/stats/read-check all
+still work — only file import needs the CDN.
 
-```python
-BEAT_PARAPHRASE_CUES = [(0.02, "scratch", {"dur": 0.35}), (0.46, "chime_soft", {})]
-```
+## How it works
 
-Each tuple is `(t_within_beat, cue_name, kwargs)` — `cue_name` must
-match a key in `CUE_LIB`.
+Everything runs client-side in plain JavaScript — no backend, no API
+calls, no data sent anywhere:
 
-**Timeline.** `TIMELINE` at the bottom of the beat definitions is the
-ordered list of `(beat_function, duration_seconds, cues)`. This is the
-only thing you need to touch to reorder, retime, add, or remove scenes.
+- **paraphrase** — a ~25-word built-in synonym dictionary (`SYN`),
+  matched case-insensitively per word with punctuation preserved, swapped
+  in at a probability set by the chosen intensity.
+- **humanize** — runs paraphrase first, then sentence-level
+  rewrites (occasional sentence merges, random openers like "Honestly,")
+  and a contraction pass (`do not` → `don't`, etc).
+- **summarize** — term-frequency sentence scoring against a small
+  stopword list, keeps the top N sentences by score, re-sorted back into
+  original order.
+- **stats** — standard Flesch Reading Ease formula
+  (`206.835 − 1.015×(words/sentences) − 84.6×(syllables/words)`) with a
+  regex-based syllable estimator (vowel-group counting).
+- **read-check** — a weighted heuristic: `(1−burstiness)×45 +
+  (1−vocab_diversity)×35 + stock_phrase_density×20`, where burstiness is
+  the coefficient of variation of sentence lengths.
+- **import** — `.txt` via `FileReader`, `.docx` via mammoth's
+  `extractRawText`, `.pdf` via pdf.js page-by-page text extraction.
 
-**Transitions.** Between every pair of beats, `ink_wipe_frames()`
-generates a short red-bar wipe (duration set by `TRANSITION_SEC`) from
-the outgoing beat's last frame to the incoming beat's first frame, plus
-a `"whoosh"` audio cue. This happens automatically — you don't add it
-to `TIMELINE` yourself.
+## Honest limitations
 
-**Audio.** `CUE_LIB` maps cue names to zero-argument (or
-keyword-argument) functions that return a numpy float array:
-- `tone(freq, dur, amp, harmonics)` — a decaying bell/chime tone
-- `band_noise(dur, low, high, amp, ...)` — filtered noise (scratches,
-  whooshes, clicks)
-- `click(amp)` — a short two-noise-band click (typewriter tick)
+- **Paraphrase coverage is narrow.** The synonym set is a few dozen
+  common words, not a full thesaurus — good for a demo, not comprehensive.
+  The standalone `paraphraser.py` script (WordNet-backed) has much wider
+  coverage if you need that.
+- **read-check is a heuristic, not a certified AI detector.** It's built
+  from the same *categories* of signal real detectors use, but it's not
+  trained on a labeled dataset. Treat the score as a rough signal.
+- **No plagiarism checking.** That needs a live index of the web/papers
+  to compare against — not something a static page can carry. Nothing
+  here claims to do this.
+- **humanize can break factual/technical precision.** Synonym swaps
+  don't understand meaning — review anything before using it for work
+  that needs to stay accurate.
+- Using this to get past a required-original-work check (school,
+  publishing, etc.) is worth thinking twice about — most places treat
+  that as an integrity issue regardless of whether a detector catches it.
 
-A quiet two-note background pad (`render_pad`) plays under the whole
-video so it's never dead silent. All cue events get mixed onto one
-master audio array at the right sample offset, soft-clipped, then
-muxed onto the silent video with ffmpeg.
+## File
 
-## Customizing
-
-- **Colors/fonts** — edit the `THEME` dict and the `SERIF`/`MONO`
-  constants at the top.
-- **Canvas size / frame rate** — `W`, `H`, `FPS` constants.
-- **Add a beat** — write a new `beat_x(t)` function plus a
-  `BEAT_X_CUES` list, then add `(beat_x, duration_seconds, BEAT_X_CUES)`
-  to `TIMELINE` wherever you want it to play.
-- **Change a sound** — every effect is defined in one place, `CUE_LIB`;
-  tweak frequency/duration/amplitude directly, no audio files to source.
-- **Transition feel** — `TRANSITION_SEC` controls wipe speed;
-  `ink_wipe_frames()` controls its look (currently a left-to-right red
-  bar sweep).
-
-## Known limitations
-
-- Text layout is manual (`d.text(...)` with hand-placed coordinates) —
-  there's no auto-wrapping, so longer strings need their position
-  recalculated by hand.
-- No text antialiasing beyond what Pillow/freetype does by default at
-  this resolution — fine at 1280×720, would want supersampling at
-  higher output resolutions.
-- Mono audio only.
-- Rendering is frame-by-frame via Pillow (not GPU-accelerated); a
-  20-second video takes a few seconds to render but a much longer video
-  would scale linearly.
+- `redline.html` — the entire app, one file, ~15KB.
