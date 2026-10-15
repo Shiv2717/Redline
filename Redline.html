@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Redline</title>
+<style>
+:root{
+  --paper:#17191b; --paper2:#1e2123; --ink:#e9e6df; --ink-dim:#9a958a;
+  --rule:#34383a; --red:#c1443b; --red-dim:#7a3430; --moss:#8a9b74;
+  --mono:'Courier New',ui-monospace,monospace;
+  --serif:Georgia,'Iowan Old Style','Times New Roman',serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --paper:#f3f1ea; --paper2:#eae7dd; --ink:#1d1b16; --ink-dim:#6b6558;
+    --rule:#cfc9ba; --red:#a8362d; --red-dim:#c97a73; --moss:#55663f;
+  }
+}
+:root[data-theme="dark"]{ color-scheme: dark; }
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper);}
+.wrap{max-width:860px;margin:0 auto;padding:2.5rem 1.5rem 4rem;}
+header{display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid var(--rule);padding-bottom:1rem;margin-bottom:.25rem;}
+h1{font-family:var(--mono);font-size:1.6rem;font-weight:700;margin:0;letter-spacing:-.02em;}
+h1 span{color:var(--red);text-decoration:line-through;text-decoration-color:var(--red);text-decoration-thickness:2px;}
+.sub{font-size:.8rem;color:var(--ink-dim);font-family:var(--mono);margin-top:.35rem;}
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin:1.75rem 0 0;border-bottom:1px solid var(--rule);}
+.tab{font-family:var(--mono);font-size:.78rem;padding:.55rem .9rem;background:none;border:1px solid var(--rule);border-bottom:none;color:var(--ink-dim);cursor:pointer;border-radius:4px 4px 0 0;margin-right:.3rem;position:relative;top:1px;}
+.tab[aria-selected="true"]{color:var(--ink);background:var(--paper2);border-bottom:1px solid var(--paper2);}
+.panel{background:var(--paper2);border:1px solid var(--rule);border-top:none;padding:1.5rem;border-radius:0 4px 4px 4px;}
+textarea{width:100%;min-height:150px;
+  background:repeating-linear-gradient(var(--paper2) 0 31px, var(--rule) 31px 32px);
+  background-attachment:local;color:var(--ink);border:none;outline:none;
+  font-family:var(--serif);font-size:1.02rem;line-height:32px;padding:0 0 0 2px;resize:vertical;}
+textarea::placeholder{color:var(--ink-dim);}
+.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:1rem;}
+.opt{font-family:var(--mono);font-size:.78rem;padding:.4rem .75rem;border:1px solid var(--rule);background:transparent;color:var(--ink-dim);cursor:pointer;border-radius:3px;}
+.opt[aria-pressed="true"]{border-color:var(--red);color:var(--red);}
+.go{margin-left:auto;font-family:var(--mono);font-size:.85rem;padding:.55rem 1.1rem;background:var(--red);color:#fff;border:none;border-radius:3px;cursor:pointer;}
+.go:active{background:var(--red-dim);}
+.out{margin-top:1.75rem;padding-top:1.25rem;border-top:1px dashed var(--rule);font-size:1.02rem;line-height:1.75;}
+.out:empty{display:none;}
+del{color:var(--ink-dim);text-decoration:line-through;text-decoration-color:var(--red);opacity:.6;}
+ins{color:var(--moss);text-decoration:none;font-style:italic;}
+.meta{font-family:var(--mono);font-size:.75rem;color:var(--ink-dim);margin-top:1rem;}
+.gauge{display:flex;align-items:center;gap:1rem;margin-top:.5rem;}
+.gauge-track{flex:1;height:8px;background:var(--rule);border-radius:4px;overflow:hidden;}
+.gauge-fill{height:100%;background:var(--red);transition:width .4s ease;}
+.verdict{font-family:var(--mono);font-size:.95rem;white-space:nowrap;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1rem;}
+.stat-grid div{font-family:var(--mono);}
+.stat-grid b{display:block;font-size:1.5rem;color:var(--ink);font-weight:700;}
+.stat-grid small{color:var(--ink-dim);font-size:.72rem;}
+.note{font-size:.78rem;color:var(--ink-dim);margin-top:1.5rem;line-height:1.5;}
+@media (max-width:500px){ .go{margin-left:0;width:100%;text-align:center;} }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header><h1><span>Draft.</span> Redline</h1></header>
+  <div class="sub">a copy-editor's desk for text — reword it, condense it, or check how it reads</div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" aria-selected="true" data-mode="paraphrase">paraphrase</button>
+    <button class="tab" aria-selected="false" data-mode="humanize">humanize</button>
+    <button class="tab" aria-selected="false" data-mode="summarize">summarize</button>
+    <button class="tab" aria-selected="false" data-mode="stats">stats</button>
+    <button class="tab" aria-selected="false" data-mode="detect">read-check</button>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="margin-top:0;margin-bottom:.9rem;">
+      <button class="opt" id="importBtn" type="button">import .txt / .docx / .pdf</button>
+      <input type="file" id="fileInput" accept=".txt,.pdf,.docx" style="display:none">
+      <span class="sub" id="fileName" style="margin:0;"></span>
+    </div>
+    <textarea id="input" placeholder="Paste a paragraph to work on… or import a file above"></textarea>
+    <div class="row" id="modeOpts"></div>
+    <div class="out" id="out"></div>
+    <div class="row" id="afterRow" style="display:none;margin-top:.5rem;">
+      <button class="opt" id="downloadBtn" type="button">download result as .txt</button>
+    </div>
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <p class="note">The paraphraser and summarizer run on built-in word lists and scoring, not a trained model — good for a quick pass, not a substitute for your own edit. The read-check score is a rough heuristic (sentence rhythm, word repetition, stock phrases), not a certified AI detector, and this isn't a plagiarism checker — that needs a live index of the web to compare against. If the goal is getting past a required-original-work check, that's worth thinking twice about either way.</p>
+</div>
+
+<script>
+const SYN = {
+  important:['significant','notable','key','crucial'], big:['large','sizable','substantial'],
+  small:['minor','modest','slight'], show:['reveal','demonstrate','indicate'],
+  use:['utilize','employ','apply'], good:['solid','strong','sound'],
+  bad:['poor','weak','flawed'], help:['assist','aid','support'],
+  make:['create','produce','form'], think:['believe','reckon','consider'],
+  problem:['issue','difficulty','trouble'], change:['shift','alter','adjust'],
+  start:['begin','launch','open'], end:['finish','conclude','close'],
+  fast:['quick','swift','rapid'], easy:['simple','straightforward'],
+  hard:['difficult','tough','demanding'], many:['numerous','several'],
+  result:['outcome','effect','consequence'], often:['frequently','regularly'],
+  need:['require','call for'], find:['discover','identify','locate'],
+  understand:['grasp','comprehend'], improve:['enhance','strengthen'],
+  idea:['concept','notion'], method:['approach','technique'],
+};
+const STOCK = ['furthermore','moreover','in conclusion','it is important to note','delve into',
+  "in today's world",'plays a crucial role','navigate the complexities','unlock the potential',
+  'tapestry','testament to','in summary','it is worth noting','underscores the importance'];
+const STOP = new Set(['the','a','an','and','or','but','is','are','was','were','in','on','of','to','for',
+  'with','that','this','it','as','at','by','be','been','from','not','have','has','had','i','you','he',
+  'she','they','we','its','their','his','her','will','would','can','could']);
+
+function sentences(t){ return t.match(/[^.!?]+[.!?]*/g)?.map(s=>s.trim()).filter(Boolean) || [t]; }
+function words(t){ return t.split(/\s+/).filter(Boolean); }
+function pickCase(orig, repl){ return orig[0]===orig[0].toUpperCase() ? repl[0].toUpperCase()+repl.slice(1) : repl; }
+
+function paraphrase(text, style){
+  const prob = style==='fluency'?0.3:style==='creative'?0.65:0.45;
+  let out=[];
+  text.split(/(\s+)/).forEach(tok=>{
+    const m = tok.match(/^([^\w']*)([\w']+)([^\w']*)$/);
+    if(!m){ out.push(tok); return; }
+    const [, lead, core, trail] = m;
+    const opts = SYN[core.toLowerCase()];
+    if(opts && opts.length && Math.random()<prob){
+      const choice = pickCase(core, opts[Math.floor(Math.random()*Math.min(opts.length, style==='fluency'?1:3))]);
+      out.push(`${lead}<del>${core}</del><ins>${choice}</ins>${trail}`);
+    } else out.push(tok);
+  });
+  return out.join('');
+}
+
+const CONTRACT = [[/do not/gi,"don't"],[/does not/gi,"doesn't"],[/is not/gi,"isn't"],
+  [/are not/gi,"aren't"],[/cannot/gi,"can't"],[/will not/gi,"won't"],[/it is/gi,"it's"],
+  [/that is/gi,"that's"],[/i am/gi,"I'm"],[/you are/gi,"you're"]];
+
+function humanize(text, intensity){
+  let marked = paraphrase(text, intensity==='light'?'fluency':intensity==='heavy'?'creative':'standard');
+  let plain = marked.replace(/<del>.*?<\/del><ins>(.*?)<\/ins>/g,'$1');
+  const openers = ['Honestly, ','Basically, ','Really, ','',''];
+  let built = sentences(plain).map(s=>{
+    if(Math.random()<0.3){ const o=openers[Math.floor(Math.random()*openers.length)]; return o + s[0].toLowerCase()+s.slice(1); }
+    return s;
+  }).join(' ');
+  CONTRACT.forEach(([re,sub])=> built = built.replace(re,sub));
+  return built;
+}
+
+function analyze(text){
+  const sents = sentences(text);
+  const lens = sents.map(s=>words(s).length);
+  const mean = lens.reduce((a,b)=>a+b,0)/Math.max(1,lens.length);
+  const variance = lens.reduce((a,b)=>a+(b-mean)**2,0)/Math.max(1,lens.length);
+  const burst = Math.max(0,Math.min(1,(Math.sqrt(variance)/Math.max(mean,1))/0.6));
+  const w = words(text).map(x=>x.toLowerCase().replace(/[^\w]/g,'')).filter(Boolean);
+  const diversity = new Set(w).size/Math.max(1,w.length);
+  const tl = text.toLowerCase();
+  const stockHits = STOCK.filter(p=>tl.includes(p)).length;
+  let score = (1-burst)*45 + (1-Math.min(diversity*2.2,1))*35 + Math.min((stockHits/Math.max(1,sents.length))*3,1)*20;
+  score = Math.round(Math.max(0,Math.min(100,score)));
+  const verdict = score>=70?'reads AI-flavored':score>=40?'mixed signal':'reads human-written';
+  return {score,verdict,burst,diversity,stockHits};
+}
+
+function countSyllables(word){
+  word = word.toLowerCase().replace(/[^a-z]/g,'');
+  if(!word) return 0;
+  const groups = word.match(/[aeiouy]+/g);
+  let count = groups ? groups.length : 1;
+  if(word.endsWith('e') && count>1) count--;
+  return Math.max(1,count);
+}
+
+function stats(text){
+  const sents = sentences(text), ws = words(text);
+  const syl = ws.reduce((a,w)=>a+countSyllables(w),0);
+  const avgWps = ws.length/Math.max(1,sents.length);
+  const flesch = Math.round(206.835 - 1.015*avgWps - 84.6*(syl/Math.max(1,ws.length)));
+  const level = flesch>=90?'very easy':flesch>=70?'easy':flesch>=50?'moderate':flesch>=30?'difficult':'very difficult';
+  return {words:ws.length, sentences:sents.length, avgWps:avgWps.toFixed(1), flesch, level, readMin:Math.max(1,Math.round(ws.length/200))};
+}
+
+function summarize(text, ratio){
+  const sents = sentences(text);
+  if(sents.length<=2) return text;
+  const freq = {};
+  sents.forEach(s=> words(s).forEach(w=>{ const c=w.toLowerCase().replace(/[^\w]/g,''); if(c && !STOP.has(c)) freq[c]=(freq[c]||0)+1; }));
+  const scored = sents.map((s,i)=>({i,s,score: words(s).reduce((a,w)=>a+(freq[w.toLowerCase().replace(/[^\w]/g,'')]||0),0)/Math.max(1,words(s).length)}));
+  const keep = Math.max(1, Math.round(sents.length*ratio));
+  return scored.slice().sort((a,b)=>b.score-a.score).slice(0,keep).sort((a,b)=>a.i-b.i).map(x=>x.s).join(' ');
+}
+
+let mode='paraphrase';
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
+  t.setAttribute('aria-selected','true'); mode=t.dataset.mode;
+  document.getElementById('out').innerHTML=''; document.getElementById('meta').innerHTML='';
+  document.getElementById('afterRow').style.display='none';
+  buildOpts();
+}));
+
+function buildOpts(){
+  const box = document.getElementById('modeOpts');
+  if(mode==='paraphrase'){
+    box.innerHTML = `<button class="opt" data-v="standard" aria-pressed="true">standard</button>
+      <button class="opt" data-v="fluency" aria-pressed="false">fluency</button>
+      <button class="opt" data-v="creative" aria-pressed="false">creative</button>
+      <button class="go" id="run">Mark it up</button>`;
+  } else if(mode==='humanize'){
+    box.innerHTML = `<button class="opt" data-v="light" aria-pressed="false">light</button>
+      <button class="opt" data-v="standard" aria-pressed="true">standard</button>
+      <button class="opt" data-v="heavy" aria-pressed="false">heavy</button>
+      <button class="go" id="run">Loosen it up</button>`;
+  } else if(mode==='summarize'){
+    box.innerHTML = `<button class="opt" data-v="0.25" aria-pressed="false">short</button>
+      <button class="opt" data-v="0.4" aria-pressed="true">medium</button>
+      <button class="opt" data-v="0.6" aria-pressed="false">long</button>
+      <button class="go" id="run">Cut it down</button>`;
+  } else if(mode==='stats'){
+    box.innerHTML = `<button class="go" id="run" style="margin-left:0">Read it</button>`;
+  } else {
+    box.innerHTML = `<button class="go" id="run" style="margin-left:0">Check the read</button>`;
+  }
+  wireOpts(); wireRun();
+}
+function wireOpts(){
+  document.querySelectorAll('.opt[data-v]').forEach(o=>o.addEventListener('click',()=>{
+    document.querySelectorAll('.opt[data-v]').forEach(x=>x.setAttribute('aria-pressed','false'));
+    o.setAttribute('aria-pressed','true');
+  }));
+}
+function activeVal(){ const a=document.querySelector('.opt[data-v][aria-pressed="true"]'); return a?a.dataset.v:'standard'; }
+
+function wireRun(){
+  document.getElementById('run').addEventListener('click',()=>{
+    const text = document.getElementById('input').value.trim();
+    const out = document.getElementById('out'), meta = document.getElementById('meta'), after = document.getElementById('afterRow');
+    if(!text){ out.innerHTML='<span style="color:var(--ink-dim)">Nothing on the page yet.</span>'; meta.innerHTML=''; after.style.display='none'; return; }
+    if(mode==='paraphrase'){
+      out.innerHTML = paraphrase(text, activeVal());
+      meta.textContent = 'struck-through = original · italic = swapped in';
+    } else if(mode==='humanize'){
+      out.textContent = humanize(text, activeVal());
+      const r = analyze(out.textContent);
+      meta.textContent = `read-check after: ${r.score}/100 — ${r.verdict}`;
+    } else if(mode==='summarize'){
+      out.textContent = summarize(text, parseFloat(activeVal()));
+      const before = words(text).length, afterW = words(out.textContent).length;
+      meta.textContent = `${before} words → ${afterW} words (${Math.round(100-afterW/Math.max(1,before)*100)}% shorter)`;
+    } else if(mode==='stats'){
+      const s = stats(text);
+      out.innerHTML = `<div class="stat-grid">
+        <div><b>${s.words}</b><small>words</small></div>
+        <div><b>${s.sentences}</b><small>sentences</small></div>
+        <div><b>${s.avgWps}</b><small>words / sentence</small></div>
+        <div><b>${s.readMin}m</b><small>reading time</small></div>
+        <div><b>${s.flesch}</b><small>Flesch ease score</small></div>
+        <div><b>${s.level}</b><small>to read</small></div>
+      </div>`;
+      meta.textContent = '';
+    } else {
+      const r = analyze(text);
+      out.innerHTML = `<div class="gauge"><div class="gauge-track"><div class="gauge-fill" style="width:${r.score}%"></div></div><div class="verdict">${r.score}/100</div></div>`;
+      meta.textContent = `${r.verdict} · burstiness ${r.burst.toFixed(2)} · vocab diversity ${r.diversity.toFixed(2)} · stock phrases ${r.stockHits}`;
+    }
+    after.style.display = (mode==='stats') ? 'none' : 'flex';
+  });
+}
+
+document.getElementById('downloadBtn').addEventListener('click', ()=>{
+  const out = document.getElementById('out');
+  const blob = new Blob([out.innerText], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `redline-${mode}.txt`; a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+buildOpts();
+
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function handleFile(file){
+  const ext = file.name.split('.').pop().toLowerCase();
+  const fn = document.getElementById('fileName');
+  fn.textContent = 'reading ' + file.name + '…';
+  try{
+    let text = '';
+    if(ext === 'txt'){ text = await file.text(); }
+    else if(ext === 'docx'){ const buf = await file.arrayBuffer(); text = (await mammoth.extractRawText({arrayBuffer:buf})).value; }
+    else if(ext === 'pdf'){
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+      const pages = [];
+      for(let i=1;i<=pdf.numPages;i++){
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        pages.push(content.items.map(it=>it.str).join(' '));
+      }
+      text = pages.join('\n\n');
+    } else { fn.textContent = 'unsupported file type'; return; }
+    document.getElementById('input').value = text.trim();
+    fn.textContent = file.name + ' — loaded';
+  } catch(err){ fn.textContent = 'could not read that file'; }
+}
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+</script>
+</body>
+</html>
